@@ -156,3 +156,37 @@ class Notification(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+@receiver(post_save, sender=Submission)
+def notify_student_on_grading(sender, instance, created, **kwargs):
+    """
+    Signal to notify a student when their submission has been graded.
+    """
+    # Check if the submission was just created or if the grade was just added
+    if not created and instance.grade is not None:
+        # Check if the grade was actually changed in this save operation.
+        # This requires a bit more logic, often by comparing with the object's state
+        # before saving. For simplicity, we'll assume any save with a grade is a grading event.
+
+        message = f"Your submission for '{instance.assignment.title}' has been graded. Your grade is: {instance.grade}"
+
+        # Create a notification in the database
+        Notification.objects.create(
+            recipient=instance.student,
+            message=message
+        )
+
+        # Send a real-time notification via Channels
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+
+        channel_layer = get_channel_layer()
+        group_name = f"notifications_{instance.student.id}"
+
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                "type": "send_notification",
+                "message": message,
+            }
+        )

@@ -1,6 +1,8 @@
 from django.contrib.auth.models import User
 from django.db import transaction
 from rest_framework import generics, status, permissions
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
@@ -53,11 +55,12 @@ class LoginView(ObtainAuthToken):
         })
 
 @extend_schema(summary="Retrieve or update user profile", description="Allows users to view or edit their own profile.")
+@method_decorator(cache_page(60 * 10), name='get') # Cache GET requests for 10 minutes
 class ProfileView(generics.RetrieveUpdateAPIView):
     """
     API endpoint for retrieving and updating user profile.
     """
-    queryset = Profile.objects.all()
+    queryset = Profile.objects.select_related('user').all()
     serializer_class = ProfileSerializer
     permission_classes = [permissions.IsAuthenticated, IsProfileOwner]
 
@@ -79,6 +82,7 @@ class CourseCreateView(generics.CreateAPIView):
         serializer.save(teacher=self.request.user)
 
 @extend_schema(summary="List assignments", description="Lists assignments for the courses the user is enrolled in (for students) or teaches (for teachers).")
+@method_decorator(cache_page(60 * 5), name='get') # Cache for 5 minutes
 class AssignmentListView(generics.ListAPIView):
     """
     API endpoint to list all assignments for the current user's enrolled courses.
@@ -91,10 +95,10 @@ class AssignmentListView(generics.ListAPIView):
         if user.profile.role == 'STUDENT':
             # Students see assignments for their enrolled courses
             enrolled_courses = user.enrolled_courses.all()
-            return Assignment.objects.filter(course__in=enrolled_courses)
+            return Assignment.objects.filter(course__in=enrolled_courses).select_related('course')
         elif user.profile.role == 'TEACHER':
             # Teachers see assignments for the courses they teach
-            return Assignment.objects.filter(course__teacher=user)
+            return Assignment.objects.filter(course__teacher=user).select_related('course')
         return Assignment.objects.none()
 
 @extend_schema(summary="Submit an assignment (Students only)", description="Allows students to upload a file as a submission for an assignment.")
@@ -111,6 +115,7 @@ class SubmissionCreateView(generics.CreateAPIView):
         serializer.save(student=self.request.user)
 
 @extend_schema(summary="List quizzes", description="Lists quizzes for the courses the user is enrolled in (for students) or teaches (for teachers).")
+@method_decorator(cache_page(60 * 5), name='get') # Cache for 5 minutes
 class QuizListView(generics.ListAPIView):
     """
     API endpoint to list all available quizzes for the user.
@@ -122,18 +127,19 @@ class QuizListView(generics.ListAPIView):
         user = self.request.user
         if user.profile.role == 'STUDENT':
             enrolled_courses = user.enrolled_courses.all()
-            return Quiz.objects.filter(course__in=enrolled_courses)
+            return Quiz.objects.filter(course__in=enrolled_courses).select_related('course')
         elif user.profile.role == 'TEACHER':
-            return Quiz.objects.filter(course__teacher=user)
+            return Quiz.objects.filter(course__teacher=user).select_related('course')
         return Quiz.objects.none()
 
 @extend_schema(summary="Retrieve a quiz", description="Gets the details of a specific quiz, including its questions and choices. Access is restricted to enrolled students or the course teacher.")
+@method_decorator(cache_page(60 * 10), name='get') # Cache for 10 minutes
 class QuizDetailView(generics.RetrieveAPIView):
     """
     API endpoint to retrieve the details of a single quiz.
     Access is restricted to enrolled students or the teacher.
     """
-    queryset = Quiz.objects.all()
+    queryset = Quiz.objects.prefetch_related('questions__choices').all()
     serializer_class = QuizDetailSerializer
     permission_classes = [permissions.IsAuthenticated, IsEnrolledOrTeacher]
 
@@ -189,12 +195,13 @@ class SubmitQuizView(APIView):
         }, status=status.HTTP_200_OK)
 
 @extend_schema(summary="List user notifications", description="Retrieves a list of all notifications for the currently logged-in user.")
+@method_decorator(cache_page(60 * 2), name='get') # Cache for 2 minutes
 class NotificationListView(generics.ListAPIView):
     serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return self.request.user.notifications.all()
+        return self.request.user.notifications.select_related('recipient').all()
 
 @extend_schema(summary="Mark a notification as read", description="Marks a specific notification as read.")
 class MarkNotificationAsReadView(generics.UpdateAPIView):

@@ -1,0 +1,9 @@
+Django
+djangorestframework
+drf-spectacular
+django-redis
+redis
+channels
+channels_redis
+daphne
+Pillow
