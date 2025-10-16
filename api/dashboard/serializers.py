@@ -65,3 +65,8 @@ class AnswerSerializer(serializers.Serializer):
 
 class SubmitQuizSerializer(serializers.Serializer):
     answers = AnswerSerializer(many=True)
+
+class CourseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Course
+        fields = ['id', 'name', 'code']

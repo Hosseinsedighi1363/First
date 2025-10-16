@@ -15,7 +15,16 @@ class Profile(models.Model):
     """
     Extends the default User model to store student-specific information.
     """
+    class Role(models.TextChoices):
+        STUDENT = 'STUDENT', 'Student'
+        TEACHER = 'TEACHER', 'Teacher'
+
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+    role = models.CharField(
+        max_length=10,
+        choices=Role.choices,
+        default=Role.STUDENT,
+    )
     student_id = models.CharField(max_length=100, blank=True, null=True)
     profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
 
@@ -30,9 +39,24 @@ class Course(models.Model):
     code = models.CharField(max_length=20, unique=True)
     # Assuming the teacher is also a user in the system
     teacher = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='taught_courses')
+    students = models.ManyToManyField(User, through='Enrollment', related_name='enrolled_courses')
 
     def __str__(self):
         return self.name
+
+class Enrollment(models.Model):
+    """
+    Represents the enrollment of a student in a course.
+    """
+    student = models.ForeignKey(User, on_delete=models.CASCADE)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('student', 'course') # A student can only enroll once in a course
+
+    def __str__(self):
+        return f'{self.student.username} enrolled in {self.course.name}'
 
 class Assignment(models.Model):
     """

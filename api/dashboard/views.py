@@ -8,8 +8,10 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from .models import Profile, Assignment, Submission, Quiz, Question, Choice, QuizAttempt, Answer
 from .serializers import (
     UserSerializer, ProfileSerializer, AssignmentSerializer, SubmissionSerializer,
-    QuizSerializer, QuizDetailSerializer, SubmitQuizSerializer
+    QuizSerializer, QuizDetailSerializer, SubmitQuizSerializer, CourseSerializer
 )
+from .permissions import IsTeacher, IsStudent, IsProfileOwner, IsEnrolledOrTeacher
+from .models import Course
 
 class RegisterView(generics.CreateAPIView):
     """
@@ -48,31 +50,50 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     """
     queryset = Profile.objects.all()
     serializer_class = ProfileSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsProfileOwner]
 
     def get_object(self):
         # Return the profile of the currently logged-in user
         return self.request.user.profile
 
+class CourseCreateView(generics.CreateAPIView):
+    """
+    API endpoint for teachers to create new courses.
+    """
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer # We need to create this
+    permission_classes = [permissions.IsAuthenticated, IsTeacher]
+
+    def perform_create(self, serializer):
+        # Set the current user as the teacher of the course
+        serializer.save(teacher=self.request.user)
+
 class AssignmentListView(generics.ListAPIView):
     """
-    API endpoint to list all assignments for the current user.
+    API endpoint to list all assignments for the current user's enrolled courses.
     """
     serializer_class = AssignmentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # This is a simplified example. In a real app, you'd filter assignments
-        # based on the courses the user is enrolled in.
-        return Assignment.objects.all()
+        user = self.request.user
+        if user.profile.role == 'STUDENT':
+            # Students see assignments for their enrolled courses
+            enrolled_courses = user.enrolled_courses.all()
+            return Assignment.objects.filter(course__in=enrolled_courses)
+        elif user.profile.role == 'TEACHER':
+            # Teachers see assignments for the courses they teach
+            return Assignment.objects.filter(course__teacher=user)
+        return Assignment.objects.none()
+
 
 class SubmissionCreateView(generics.CreateAPIView):
     """
-    API endpoint for submitting a file for an assignment.
+    API endpoint for submitting a file for an assignment. Only for students.
     """
     queryset = Submission.objects.all()
     serializer_class = SubmissionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsStudent]
 
     def perform_create(self, serializer):
         # Associate the submission with the current user
@@ -80,25 +101,34 @@ class SubmissionCreateView(generics.CreateAPIView):
 
 class QuizListView(generics.ListAPIView):
     """
-    API endpoint to list all available quizzes.
+    API endpoint to list all available quizzes for the user.
     """
-    queryset = Quiz.objects.all()
     serializer_class = QuizSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        user = self.request.user
+        if user.profile.role == 'STUDENT':
+            enrolled_courses = user.enrolled_courses.all()
+            return Quiz.objects.filter(course__in=enrolled_courses)
+        elif user.profile.role == 'TEACHER':
+            return Quiz.objects.filter(course__teacher=user)
+        return Quiz.objects.none()
+
 class QuizDetailView(generics.RetrieveAPIView):
     """
-    API endpoint to retrieve the details of a single quiz, including questions and choices.
+    API endpoint to retrieve the details of a single quiz.
+    Access is restricted to enrolled students or the teacher.
     """
     queryset = Quiz.objects.all()
     serializer_class = QuizDetailSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsEnrolledOrTeacher]
 
 class SubmitQuizView(APIView):
     """
-    API endpoint to submit answers for a quiz and get the result.
+    API endpoint to submit answers for a quiz. Only for students.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsStudent]
 
     def post(self, request, quiz_id, *args, **kwargs):
         serializer = SubmitQuizSerializer(data=request.data)
