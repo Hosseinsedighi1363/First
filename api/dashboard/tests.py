@@ -2,7 +2,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from django.contrib.auth.models import User
-from .models import Course, Enrollment, Assignment, Profile, Submission, Notification
+from .models import Course, Enrollment, Assignment, Profile, Submission, Notification, Quiz, QuizAttempt
 from rest_framework.authtoken.models import Token
 
 class PermissionTests(APITestCase):
@@ -153,3 +153,76 @@ class NotificationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         notification.refresh_from_db()
         self.assertTrue(notification.is_read)
+
+class AnalyticsTests(APITestCase):
+    def setUp(self):
+        # Teacher 1
+        self.teacher1 = User.objects.create_user(username='teacher_analytics', password='password')
+        Profile.objects.create(user=self.teacher1, role='TEACHER')
+        self.teacher1_token = Token.objects.get(user=self.teacher1)
+
+        # Teacher 2
+        self.teacher2 = User.objects.create_user(username='teacher_other', password='password')
+        Profile.objects.create(user=self.teacher2, role='TEACHER')
+        self.teacher2_token = Token.objects.get(user=self.teacher2)
+
+        # Students
+        self.student1 = User.objects.create_user(username='student_analytics1', password='password')
+        Profile.objects.create(user=self.student1, role='STUDENT')
+        self.student1_token = Token.objects.get(user=self.student1)
+        self.student2 = User.objects.create_user(username='student_analytics2', password='password')
+        Profile.objects.create(user=self.student2, role='STUDENT')
+
+        # Course and Enrollment
+        self.course = Course.objects.create(name='Analytics Course', code='AC101', teacher=self.teacher1)
+        Enrollment.objects.create(student=self.student1, course=self.course)
+        Enrollment.objects.create(student=self.student2, course=self.course)
+
+        # Assignment and Submissions
+        self.assignment = Assignment.objects.create(title='Analytics Assignment', due_date='2099-12-31T23:59:59Z', course=self.course)
+        Submission.objects.create(assignment=self.assignment, student=self.student1, file='s1.txt', grade=80)
+        # Student 2 did not submit
+
+        # Quiz and Attempts
+        self.quiz = Quiz.objects.create(title='Analytics Quiz', course=self.course, duration_minutes=10)
+        QuizAttempt.objects.create(student=self.student1, quiz=self.quiz, score=90)
+        QuizAttempt.objects.create(student=self.student2, quiz=self.quiz, score=70)
+
+    def test_teacher_can_view_course_analytics(self):
+        """
+        Ensure the course teacher can access the analytics endpoint.
+        """
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.teacher1_token.key)
+        url = reverse('course-analytics', kwargs={'course_id': self.course.pk})
+        response = self.client.get(url, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['course_id'], self.course.pk)
+        self.assertEqual(response.data['total_students'], 2)
+
+        # Check assignment analytics
+        self.assertEqual(len(response.data['assignments']), 1)
+        self.assertEqual(response.data['assignments'][0]['average_grade'], 80.0)
+        self.assertEqual(response.data['assignments'][0]['participation_percentage'], 50.0) # 1 out of 2 students submitted
+
+        # Check quiz analytics
+        self.assertEqual(len(response.data['quizzes']), 1)
+        self.assertEqual(response.data['quizzes'][0]['average_score'], 80.0) # (90+70)/2
+
+    def test_other_teacher_cannot_view_analytics(self):
+        """
+        Ensure a teacher cannot view analytics for a course they do not teach.
+        """
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.teacher2_token.key)
+        url = reverse('course-analytics', kwargs={'course_id': self.course.pk})
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_student_cannot_view_analytics(self):
+        """
+        Ensure a student cannot view course analytics.
+        """
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.student1_token.key)
+        url = reverse('course-analytics', kwargs={'course_id': self.course.pk})
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

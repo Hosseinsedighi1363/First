@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     RegisterView, LoginView, ProfileView, AssignmentListView, SubmissionCreateView,
     QuizListView, QuizDetailView, SubmitQuizView, CourseCreateView,
-    NotificationListView, MarkNotificationAsReadView
+    NotificationListView, MarkNotificationAsReadView, CourseAnalyticsView
 )
 
 urlpatterns = [
@@ -15,6 +15,7 @@ urlpatterns = [
 
     # Courses
     path('courses/create/', CourseCreateView.as_view(), name='course-create'),
+    path('courses/<int:course_id>/analytics/', CourseAnalyticsView.as_view(), name='course-analytics'),
 
     # Assignments & Submissions
     path('assignments/', AssignmentListView.as_view(), name='assignment-list'),

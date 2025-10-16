@@ -11,8 +11,9 @@ from .serializers import (
     QuizSerializer, QuizDetailSerializer, SubmitQuizSerializer, CourseSerializer,
     NotificationSerializer
 )
-from .permissions import IsTeacher, IsStudent, IsProfileOwner, IsEnrolledOrTeacher
-from .models import Course, Notification
+from .permissions import IsTeacher, IsStudent, IsProfileOwner, IsEnrolledOrTeacher, IsCourseTeacher
+from .models import Course, Notification, Assignment, Quiz
+from django.db.models import Avg, Count
 from drf_spectacular.utils import extend_schema
 
 @extend_schema(
@@ -211,3 +212,61 @@ class MarkNotificationAsReadView(generics.UpdateAPIView):
         instance.save()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+@extend_schema(
+    summary="Get course analytics (Teacher only)",
+    description="Retrieves detailed analytics for a specific course, including student count, assignment participation, and average grades. Access is restricted to the teacher of the course."
+)
+class CourseAnalyticsView(APIView):
+    """
+    Provides analytics for a specific course. Only accessible by the course teacher.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsCourseTeacher]
+
+    def get(self, request, course_id, *args, **kwargs):
+        try:
+            course = Course.objects.get(pk=course_id)
+        except Course.DoesNotExist:
+            return Response({'error': 'Course not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Check object-level permissions
+        self.check_object_permissions(request, course)
+
+        total_students = course.students.count()
+
+        # Assignment analytics
+        assignment_analytics = []
+        for assignment in course.assignments.all():
+            submissions = assignment.submissions
+            participation_count = submissions.count()
+            participation_percentage = (participation_count / total_students) * 100 if total_students > 0 else 0
+            average_grade = submissions.aggregate(avg_grade=Avg('grade'))['avg_grade']
+
+            assignment_analytics.append({
+                'assignment_id': assignment.id,
+                'title': assignment.title,
+                'average_grade': average_grade or 0,
+                'participation_percentage': round(participation_percentage, 2)
+            })
+
+        # Quiz analytics
+        quiz_analytics = []
+        for quiz in course.quizzes.all():
+            attempts = quiz.attempts
+            average_score = attempts.aggregate(avg_score=Avg('score'))['avg_score']
+
+            quiz_analytics.append({
+                'quiz_id': quiz.id,
+                'title': quiz.title,
+                'average_score': average_score or 0
+            })
+
+        analytics_data = {
+            'course_id': course.id,
+            'course_name': course.name,
+            'total_students': total_students,
+            'assignments': assignment_analytics,
+            'quizzes': quiz_analytics
+        }
+
+        return Response(analytics_data, status=status.HTTP_200_OK)

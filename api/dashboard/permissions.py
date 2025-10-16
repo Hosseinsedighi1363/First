@@ -55,3 +55,11 @@ class IsEnrolledOrTeacher(permissions.BasePermission):
             return True
 
         return False
+
+class IsCourseTeacher(permissions.BasePermission):
+    """
+    Allows access only to the teacher of the course.
+    """
+    def has_object_permission(self, request, view, obj):
+        # The object 'obj' is expected to be a Course instance.
+        return obj.teacher == request.user
