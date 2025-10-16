@@ -1,17 +1,64 @@
-import React from 'react';
+import React, { useState, useMemo, createContext } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
-import { Typography } from '@mui/material';
+import Dashboard from './components/Dashboard';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { RTL } from './theme';
+import { CssBaseline } from '@mui/material';
 
-function App() {
+export const ColorModeContext = createContext({ toggleColorMode: () => {} });
+
+function Main() {
   return (
     <Layout>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Student Dashboard
-      </Typography>
-      <Typography paragraph>
-        Welcome to your dashboard. Here you can see your assignments, quizzes, and profile.
-      </Typography>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+      </Routes>
     </Layout>
+  );
+}
+
+function App() {
+  const [mode, setMode] = useState(localStorage.getItem('themeMode') || 'light');
+
+  const colorMode = useMemo(
+    () => ({
+      toggleColorMode: () => {
+        setMode((prevMode) => {
+          const newMode = prevMode === 'light' ? 'dark' : 'light';
+          localStorage.setItem('themeMode', newMode);
+          return newMode;
+        });
+      },
+    }),
+    [],
+  );
+
+  const theme = useMemo(
+    () =>
+      createTheme({
+        direction: 'rtl',
+        typography: {
+          fontFamily: 'Vazirmatn, roboto, sans-serif',
+        },
+        palette: {
+          mode,
+        },
+      }),
+    [mode],
+  );
+
+  return (
+    <ColorModeContext.Provider value={colorMode}>
+      <RTL>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <Router>
+            <Main />
+          </Router>
+        </ThemeProvider>
+      </RTL>
+    </ColorModeContext.Provider>
   );
 }
 
