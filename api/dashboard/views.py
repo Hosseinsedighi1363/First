@@ -12,7 +12,12 @@ from .serializers import (
 )
 from .permissions import IsTeacher, IsStudent, IsProfileOwner, IsEnrolledOrTeacher
 from .models import Course
+from drf_spectacular.utils import extend_schema
 
+@extend_schema(
+    summary="Register a new user",
+    description="Create a new user account. A profile and an authentication token will be created automatically."
+)
 class RegisterView(generics.CreateAPIView):
     """
     API endpoint for user registration.
@@ -29,6 +34,7 @@ class RegisterView(generics.CreateAPIView):
         headers = self.get_success_headers(serializer.data)
         return Response({'token': token.key, 'user_id': user.id, 'username': user.username}, status=status.HTTP_201_CREATED, headers=headers)
 
+@extend_schema(summary="Login a user", description="Authenticate a user and receive an auth token.")
 class LoginView(ObtainAuthToken):
     """
     API endpoint for user login. Returns auth token.
@@ -44,6 +50,7 @@ class LoginView(ObtainAuthToken):
             'email': user.email
         })
 
+@extend_schema(summary="Retrieve or update user profile", description="Allows users to view or edit their own profile.")
 class ProfileView(generics.RetrieveUpdateAPIView):
     """
     API endpoint for retrieving and updating user profile.
@@ -56,6 +63,7 @@ class ProfileView(generics.RetrieveUpdateAPIView):
         # Return the profile of the currently logged-in user
         return self.request.user.profile
 
+@extend_schema(summary="Create a new course (Teachers only)", description="Allows users with the 'TEACHER' role to create a new course.")
 class CourseCreateView(generics.CreateAPIView):
     """
     API endpoint for teachers to create new courses.
@@ -68,6 +76,7 @@ class CourseCreateView(generics.CreateAPIView):
         # Set the current user as the teacher of the course
         serializer.save(teacher=self.request.user)
 
+@extend_schema(summary="List assignments", description="Lists assignments for the courses the user is enrolled in (for students) or teaches (for teachers).")
 class AssignmentListView(generics.ListAPIView):
     """
     API endpoint to list all assignments for the current user's enrolled courses.
@@ -86,7 +95,7 @@ class AssignmentListView(generics.ListAPIView):
             return Assignment.objects.filter(course__teacher=user)
         return Assignment.objects.none()
 
-
+@extend_schema(summary="Submit an assignment (Students only)", description="Allows students to upload a file as a submission for an assignment.")
 class SubmissionCreateView(generics.CreateAPIView):
     """
     API endpoint for submitting a file for an assignment. Only for students.
@@ -99,6 +108,7 @@ class SubmissionCreateView(generics.CreateAPIView):
         # Associate the submission with the current user
         serializer.save(student=self.request.user)
 
+@extend_schema(summary="List quizzes", description="Lists quizzes for the courses the user is enrolled in (for students) or teaches (for teachers).")
 class QuizListView(generics.ListAPIView):
     """
     API endpoint to list all available quizzes for the user.
@@ -115,6 +125,7 @@ class QuizListView(generics.ListAPIView):
             return Quiz.objects.filter(course__teacher=user)
         return Quiz.objects.none()
 
+@extend_schema(summary="Retrieve a quiz", description="Gets the details of a specific quiz, including its questions and choices. Access is restricted to enrolled students or the course teacher.")
 class QuizDetailView(generics.RetrieveAPIView):
     """
     API endpoint to retrieve the details of a single quiz.
@@ -124,6 +135,7 @@ class QuizDetailView(generics.RetrieveAPIView):
     serializer_class = QuizDetailSerializer
     permission_classes = [permissions.IsAuthenticated, IsEnrolledOrTeacher]
 
+@extend_schema(summary="Submit a quiz (Students only)", description="Allows a student to submit their answers for a quiz and receive their score immediately.")
 class SubmitQuizView(APIView):
     """
     API endpoint to submit answers for a quiz. Only for students.

@@ -40,9 +40,17 @@ INSTALLED_APPS = [
     # Third-party apps
     'rest_framework',
     'rest_framework.authtoken',
+    'drf_spectacular',
     # Local apps
     'dashboard',
 ]
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Student Dashboard API',
+    'DESCRIPTION': 'A comprehensive API for the student dashboard application.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
