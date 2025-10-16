@@ -2,7 +2,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from django.contrib.auth.models import User
-from .models import Course, Enrollment, Assignment, Profile
+from .models import Course, Enrollment, Assignment, Profile, Submission, Notification
 from rest_framework.authtoken.models import Token
 
 class PermissionTests(APITestCase):
@@ -74,3 +74,82 @@ class PermissionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # The list should be empty for this student
         self.assertEqual(len(response.data), 0)
+
+class NotificationTests(APITestCase):
+    def setUp(self):
+        # Create teacher and student users
+        self.teacher_user = User.objects.create_user(username='teacher2', password='password')
+        Profile.objects.create(user=self.teacher_user, role='TEACHER')
+        self.teacher_token = Token.objects.get(user=self.teacher_user)
+
+        self.student_user = User.objects.create_user(username='student2', password='password')
+        Profile.objects.create(user=self.student_user, role='STUDENT')
+        self.student_token = Token.objects.get(user=self.student_user)
+
+        # Create course and assignment
+        self.course = Course.objects.create(name='Notify Course', code='NC102', teacher=self.teacher_user)
+        self.assignment = Assignment.objects.create(title='Notify Assignment', due_date='2099-12-31T23:59:59Z', course=self.course)
+
+        # Create a submission from the student for the assignment
+        self.submission = Submission.objects.create(assignment=self.assignment, student=self.student_user, file='dummy.txt')
+
+    def test_notification_created_on_grading(self):
+        """
+        Ensure a notification is created automatically when a submission is graded.
+        """
+        self.assertEqual(Notification.objects.count(), 0)
+        # Grade the submission
+        self.submission.grade = 95.5
+        self.submission.save()
+
+        # Check if the notification was created
+        self.assertEqual(Notification.objects.count(), 1)
+        notification = Notification.objects.first()
+        self.assertEqual(notification.recipient, self.student_user)
+        self.assertIn('95.5', notification.message)
+        self.assertIn('Notify Assignment', notification.message)
+
+    def test_student_can_list_their_notifications(self):
+        """
+        Ensure a student can retrieve their own notifications.
+        """
+        # Create a notification manually for the test
+        Notification.objects.create(recipient=self.student_user, message="Test notification")
+
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.student_token.key)
+        url = reverse('notification-list')
+        response = self.client.get(url, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['message'], "Test notification")
+
+    def test_student_cannot_see_others_notifications(self):
+        """
+        Ensure a student cannot access notifications of another user.
+        """
+        # Create a notification for the teacher
+        Notification.objects.create(recipient=self.teacher_user, message="Teacher's notification")
+
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.student_token.key)
+        url = reverse('notification-list')
+        response = self.client.get(url, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # The list should be empty for the student
+        self.assertEqual(len(response.data), 0)
+
+    def test_student_can_mark_notification_as_read(self):
+        """
+        Ensure a student can mark their own notification as read.
+        """
+        notification = Notification.objects.create(recipient=self.student_user, message="Mark me as read")
+        self.assertFalse(notification.is_read)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.student_token.key)
+        url = reverse('notification-read', kwargs={'pk': notification.pk})
+        response = self.client.patch(url, format='json') # Using PATCH for partial update
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        notification.refresh_from_db()
+        self.assertTrue(notification.is_read)

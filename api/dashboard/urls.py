@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (
     RegisterView, LoginView, ProfileView, AssignmentListView, SubmissionCreateView,
-    QuizListView, QuizDetailView, SubmitQuizView, CourseCreateView
+    QuizListView, QuizDetailView, SubmitQuizView, CourseCreateView,
+    NotificationListView, MarkNotificationAsReadView
 )
 
 urlpatterns = [
@@ -23,4 +24,8 @@ urlpatterns = [
     path('quizzes/', QuizListView.as_view(), name='quiz-list'),
     path('quizzes/<int:pk>/', QuizDetailView.as_view(), name='quiz-detail'),
     path('quizzes/<int:quiz_id>/submit/', SubmitQuizView.as_view(), name='quiz-submit'),
+
+    # Notifications
+    path('notifications/', NotificationListView.as_view(), name='notification-list'),
+    path('notifications/<int:pk>/read/', MarkNotificationAsReadView.as_view(), name='notification-read'),
 ]

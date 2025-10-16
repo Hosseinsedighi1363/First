@@ -8,10 +8,11 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from .models import Profile, Assignment, Submission, Quiz, Question, Choice, QuizAttempt, Answer
 from .serializers import (
     UserSerializer, ProfileSerializer, AssignmentSerializer, SubmissionSerializer,
-    QuizSerializer, QuizDetailSerializer, SubmitQuizSerializer, CourseSerializer
+    QuizSerializer, QuizDetailSerializer, SubmitQuizSerializer, CourseSerializer,
+    NotificationSerializer
 )
 from .permissions import IsTeacher, IsStudent, IsProfileOwner, IsEnrolledOrTeacher
-from .models import Course
+from .models import Course, Notification
 from drf_spectacular.utils import extend_schema
 
 @extend_schema(
@@ -185,3 +186,28 @@ class SubmitQuizView(APIView):
             'correct_answers': correct_answers,
             'total_questions': total_questions
         }, status=status.HTTP_200_OK)
+
+@extend_schema(summary="List user notifications", description="Retrieves a list of all notifications for the currently logged-in user.")
+class NotificationListView(generics.ListAPIView):
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return self.request.user.notifications.all()
+
+@extend_schema(summary="Mark a notification as read", description="Marks a specific notification as read.")
+class MarkNotificationAsReadView(generics.UpdateAPIView):
+    queryset = Notification.objects.all()
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Ensure users can only affect their own notifications
+        return self.request.user.notifications.all()
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_read = True
+        instance.save()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)

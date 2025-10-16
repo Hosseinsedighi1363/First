@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Profile, Assignment, Submission, Course, Quiz, Question, Choice
+from .models import Profile, Assignment, Submission, Course, Quiz, Question, Choice, Notification
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -70,3 +70,8 @@ class CourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course
         fields = ['id', 'name', 'code']
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'message', 'is_read', 'created_at']
