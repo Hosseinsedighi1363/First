@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تکالیف - داشبورد دانشجویی</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>داشبورد دانشجویی</h1>
+    </header>
+    <div class="container">
+        <aside>
+            <nav>
+                <ul>
+                    <li><a href="index.html">پیشخوان</a></li>
+                    <li><a href="profile.html">پروفایل کاربری</a></li>
+                    <li><a href="assignments.html" class="active">تکالیف</a></li>
+                    <li><a href="quizzes.html">آزمون‌ها</a></li>
+                    <li><a href="#">خروج</a></li>
+                </ul>
+            </nav>
+        </aside>
+        <main>
+            <h2>تکالیف</h2>
+
+            <div class="assignments-list">
+                <h3>لیست تکالیف بارگذاری شده</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>عنوان تکلیف</th>
+                            <th>تاریخ ارسال</th>
+                            <th>وضعیت</th>
+                            <th>نمره</th>
+                            <th>دانلود فایل</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>پروژه درس ریاضی</td>
+                            <td>۱۴۰۳/۰۲/۱۵</td>
+                            <td>نمره داده شده</td>
+                            <td>۱۹</td>
+                            <td><a href="#">دریافت</a></td>
+                        </tr>
+                        <tr>
+                            <td>تمرین اول فیزیک</td>
+                            <td>۱۴۰۳/۰۲/۲۰</td>
+                            <td>در انتظار بررسی</td>
+                            <td>-</td>
+                            <td><a href="#">دریافت</a></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="assignment-upload-form">
+                <h3>بارگذاری تکلیف جدید</h3>
+                <form>
+                    <label for="assignmentTitle">عنوان تکلیف:</label>
+                    <input type="text" id="assignmentTitle" name="assignmentTitle" required>
+
+                    <label for="assignmentFile">انتخاب فایل:</label>
+                    <input type="file" id="assignmentFile" name="assignmentFile" required>
+
+                    <button type="submit">بارگذاری</button>
+                </form>
+            </div>
+        </main>
+    </div>
+    <script src="js/script.js"></script>
+</body>
+</html>
